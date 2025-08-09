@@ -30,7 +30,7 @@
   loop: "{{ __proxy_users }}"
   loop_control:
     label: "{{ item.proxy_port }}"
-  no_log: true
+  no_log: false
 
 - name: Start agents
   ansible.builtin.systemd:
