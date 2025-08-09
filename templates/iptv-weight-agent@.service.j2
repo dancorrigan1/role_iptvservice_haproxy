@@ -4,9 +4,12 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/iptv-weight-agent %i
+EnvironmentFile=-/etc/sysconfig/iptv-weight-agent/%i
+ExecStart=/usr/local/bin/iptv-weight-agent %i {{ role_haproxy__agent_base_port }} "$PROVIDER_URL" "$XTREAM_USER" "$XTREAM_PASS"
 Restart=always
 RestartSec=2
+# Keep secrets out of logs
+LogLevelMax=notice
 
 [Install]
 WantedBy=multi-user.target

@@ -10,20 +10,37 @@
     dest: /usr/local/bin/iptv-weight-agent
     mode: '0755'
 
-- name: Create agent systemd units
+- name: Deploy agent unit
   ansible.builtin.template:
     src: iptv-weight-agent@.service.j2
     dest: /etc/systemd/system/iptv-weight-agent@.service
     mode: '0644'
 
-- name: Start per-port agents
+- name: Ensure agent env dir
+  ansible.builtin.file:
+    path: /etc/sysconfig/iptv-weight-agent
+    state: directory
+    mode: '0750'
+
+- name: Write agent env files
+  ansible.builtin.template:
+    src: iptv-weight-agent.env.j2
+    dest: "/etc/sysconfig/iptv-weight-agent/{{ item.proxy_port }}"
+    mode: '0600'
+  loop: "{{ __proxy_users }}"
+  loop_control:
+    label: "{{ item.proxy_port }}"
+  no_log: true
+
+- name: Start agents
   ansible.builtin.systemd:
     name: "iptv-weight-agent@{{ item.proxy_port }}"
     state: started
     enabled: true
+    daemon_reload: true
   loop: "{{ __proxy_users }}"
   loop_control:
-    label: "Agent for {{ item.proxy_port }}"
+    label: "{{ item.proxy_port }}"
 
 - name: Render haproxy.cfg
   ansible.builtin.template:
