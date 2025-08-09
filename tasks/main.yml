@@ -26,14 +26,28 @@
         {%- endfor -%}
       {%- endfor -%}
       {{ out }}
+  tags:
+    - always
+
 
 - name: Include iptv_proxy tasks
   ansible.builtin.include_tasks:
     file: iptv_proxy.yml
+    apply:
+      tags:
+        - iptvproxy
+  tags:
+    - iptvproxy
+
 
 - name: Include haproxy tasks
   ansible.builtin.include_tasks:
     file: haproxy.yml
+    apply:
+      tags:
+        - iptvproxy
+  tags:
+    - iptvproxy
 
 - name: Include numconnections tasks
   ansible.builtin.include_tasks:
