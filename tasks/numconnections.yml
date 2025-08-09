@@ -1,0 +1,33 @@
+---
+- name: Gather listening ports
+  community.general.listen_ports_facts:
+    include_non_listening: true
+
+- name: Ports summary by account
+  ansible.builtin.set_fact:
+    __ports_summary: >-
+      {%- set out = [] -%}
+      {%- for account in __proxy_users | map(attribute='xtream_account') | unique -%}
+        {%- set total = 0 -%}
+        {%- for p in __proxy_users | selectattr('xtream_account','equalto',account) | map(attribute='proxy_port') -%}
+          {%- set est = (ansible_facts.tcp_listen
+            | selectattr('state','equalto','ESTABLISHED')
+            | selectattr('name','equalto','iptv-proxy')
+            | selectattr('address','equalto', role_iptvservice__firewall_local_ip)
+            | rejectattr('foreign_address','match', role_iptvservice__firewall_local_ip)
+            | selectattr('port','equalto', p)) | length -%}
+          {%- set total = total + est -%}
+        {%- endfor -%}
+        {%- set _ = out.append({'xtream_account': account, 'portstotal': total}) -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Remove overloaded from rotation (runtime)
+  ansible.builtin.shell: |
+    echo "disable server be_{{ item.0 }}/s_{{ item.1 }}" | socat stdio /var/run/haproxy/admin.sock
+  args:
+    executable: /bin/bash
+  loop: "{{ __ports_summary | subelements('portstotal', skip_missing=True) }}"
+  when: item.0.portstotal | int >= role_iptvservice__max_connections
+  changed_when: false
+  ignore_errors: true

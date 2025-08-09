@@ -1,0 +1,13 @@
+---
+# role_iptvservice__iptv_proxy_path: "/usr/bin/iptv-proxy"
+# role_iptvservice__hostname: ["iptv.example.com"]
+# role_iptvservice__proxy_start_port: 24000
+# role_iptvservice__max_connections: 200
+# role_iptvservice__iptv_logs_path: "/var/log/iptv"
+# role_iptvservice__report_path: "/var/log/iptv/reports"
+# role_iptvservice__firewall_local_ip: "127.0.0.1"
+# role_iptvservice__firewall_command: "true"
+role_haproxy__cfg_path: "/etc/haproxy/haproxy.cfg"
+role_haproxy__agent_base_port: 30000
+role_haproxy__maxconn: 20000
+# role_iptvservice__credentials: []

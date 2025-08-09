@@ -1,0 +1,52 @@
+---
+- name: Get starting and ending ports
+  ansible.builtin.set_fact:
+    __iptv_starting_port: "{{ __proxy_users | map(attribute='proxy_port') | first }}"
+    __iptv_ending_port: "{{ __proxy_users | map(attribute='proxy_port') | last }}"
+
+- name: Refresh firewall
+  ansible.builtin.command:
+    cmd: "{{ role_iptvservice__firewall_command }}"
+  register: __fw
+  changed_when: __fw.rc == 0
+  failed_when: __fw.rc != 0
+
+- name: Allow iptv-proxy ports
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_ports: "{{ __iptv_starting_port }}:{{ __iptv_ending_port }}"
+    jump: ACCEPT
+    action: insert
+
+- name: Ensure logs dir
+  ansible.builtin.file:
+    path: "{{ role_iptvservice__iptv_logs_path }}"
+    state: directory
+    mode: '0750'
+
+- name: Kill iptv-proxy
+  ansible.builtin.command:
+    cmd: pkill -9 iptv-proxy
+  ignore_errors: true
+  register: __kill
+  changed_when: __kill.rc == 0
+
+- name: Run iptv-proxy per user
+  ansible.builtin.shell:
+    cmd: >
+      (
+      /usr/bin/nohup {{ role_iptvservice__iptv_proxy_path }}
+      --port "{{ item.proxy_port }}"
+      --hostname "{{ role_iptvservice__hostname | first }}"
+      --xtream-user "{{ item.xtream_user }}"
+      --xtream-password "{{ item.xtream_pass }}"
+      --xtream-base-url "{{ item.provider_url }}"
+      --user "{{ item.proxy_username }}"
+      --password "{{ item.proxy_pass }}"
+      1>> {{ role_iptvservice__iptv_logs_path }}/iptv_{{ item.proxy_username }}.log 2>&1 ) &
+  loop: "{{ __proxy_users }}"
+  loop_control:
+    label: "Starting {{ item.proxy_username }} → {{ item.xtream_account }}/{{ item.xtream_user }} : {{ item.proxy_port }}"
+  register: __run
+  changed_when: __run.rc == 0

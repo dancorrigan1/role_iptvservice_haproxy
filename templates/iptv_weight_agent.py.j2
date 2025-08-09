@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+import socket, threading, subprocess, sys, json
+
+PORT = int(sys.argv[1])
+AGENT_PORT = {{ role_haproxy__agent_base_port }} + PORT
+MAXC = int({{ role_iptvservice__max_connections }})
+
+def count_established(port):
+    try:
+        p = subprocess.run(
+            ["ss", "-Hant", f"sport = :{port}"],
+            capture_output=True, text=True, timeout=1.5
+        )
+        lines = [l for l in p.stdout.splitlines() if "ESTAB" in l]
+        return len(lines)
+    except Exception:
+        return MAXC
+
+def compute_weight():
+    used = count_established(PORT)
+    r = min(max(used / MAXC, 0.0), 1.0)
+    w = int(round((1.0 - r) * 100))
+    w = max(1, min(100, w))
+    return f"{w}%\n"
+
+def handle(c,_):
+    try:
+        c.sendall(compute_weight().encode("ascii"))
+    finally:
+        c.close()
+
+def main():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("127.0.0.1", AGENT_PORT))
+    s.listen(64)
+    while True:
+        conn, addr = s.accept()
+        threading.Thread(target=handle, args=(conn, addr), daemon=True).start()
+
+if __name__ == "__main__":
+    main()

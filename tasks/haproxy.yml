@@ -1,0 +1,39 @@
+---
+- name: Install haproxy
+  ansible.builtin.package:
+    name: haproxy
+    state: present
+
+- name: Deploy agent script
+  ansible.builtin.template:
+    src: iptv_weight_agent.py.j2
+    dest: /usr/local/bin/iptv-weight-agent
+    mode: '0755'
+
+- name: Create agent systemd units
+  ansible.builtin.template:
+    src: iptv-weight-agent@.service.j2
+    dest: /etc/systemd/system/iptv-weight-agent@.service
+    mode: '0644'
+
+- name: Start per-port agents
+  ansible.builtin.systemd:
+    name: "iptv-weight-agent@{{ item.proxy_port }}"
+    state: started
+    enabled: true
+  loop: "{{ __proxy_users }}"
+  loop_control:
+    label: "Agent for {{ item.proxy_port }}"
+
+- name: Render haproxy.cfg
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: "{{ role_haproxy__cfg_path }}"
+    mode: '0644'
+  notify: Reload haproxy
+
+- name: Ensure haproxy started
+  ansible.builtin.service:
+    name: haproxy
+    state: started
+    enabled: true

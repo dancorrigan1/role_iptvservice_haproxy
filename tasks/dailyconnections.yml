@@ -1,0 +1,39 @@
+---
+- name: Stat previous log
+  ansible.builtin.stat:
+    path: "{{ role_iptvservice__nginx_log_prev_day }}"
+  register: __prev
+- name: Assert prev exists
+  ansible.builtin.assert:
+    that: __prev.stat.exists | bool
+    msg: "Previous day log does not exist."
+  when: not __prev.stat.exists | bool
+- name: Setup minimal facts
+  ansible.builtin.setup:
+    gather_subset: ['!all', '!min', 'date_time']
+  when: __prev.stat.exists | bool
+- name: Slurp prev log
+  ansible.builtin.slurp:
+    src: "{{ role_iptvservice__nginx_log_prev_day }}"
+  register: __log
+  when: __prev.stat.exists | bool
+- name: Decode prev log
+  ansible.builtin.set_fact:
+    __full_log: "{{ __log.content | b64decode }}"
+  when: __prev.stat.exists | bool
+- name: Select iptv lines
+  ansible.builtin.set_fact:
+    __iptv_log: "{{ __full_log.splitlines() | select('search', '(/player_api.php|/xmltv.php|/live)') | select('search', role_iptvservice__firewall_local_ip) }}"
+  when: __prev.stat.exists | bool
+- name: Build report files
+  ansible.builtin.template:
+    src: report.txt.j2
+    dest: "{{ role_iptvservice__report_path }}/{{ ansible_date_time.date }}-iptv-monitor.txt"
+    mode: '0600'
+  when: __prev.stat.exists | bool
+- name: Build html
+  ansible.builtin.template:
+    src: report.html.j2
+    dest: "{{ role_iptvservice__report_path }}/{{ ansible_date_time.date }}-iptv-monitor.html"
+    mode: '0600'
+  when: __prev.stat.exists | bool

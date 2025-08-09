@@ -1,0 +1,39 @@
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    maxconn {{ role_haproxy__maxconn }}
+    daemon
+
+defaults
+    log global
+    mode http
+    option dontlognull
+    timeout connect 5s
+    timeout client  60s
+    timeout server  60s
+
+frontend fe_http
+    bind *:80
+    acl acme path_beg /.well-known/acme-challenge/
+    use_backend be_acme if acme
+{% for u in __proxy_users | map(attribute='proxy_username') | unique | sort %}
+    acl u_{{ u }} path_beg /{{ u }}/
+{% endfor %}
+{% for u in __proxy_users | map(attribute='proxy_username') | unique | sort %}
+    use_backend be_{{ u }} if u_{{ u }}
+{% endfor %}
+    default_backend be_root
+
+backend be_root
+    http-request return status 404
+
+backend be_acme
+    http-request return status 200
+
+{% for u in __proxy_users | map(attribute='proxy_username') | unique | sort %}
+backend be_{{ u }}
+    balance roundrobin
+{% for item in __proxy_users | selectattr('proxy_username','equalto',u) %}
+    server s_{{ item.xtream_account | replace('-','_') }} 127.0.0.1:{{ item.proxy_port }} check inter 2s fall 3 rise 2 agent-check agent-addr 127.0.0.1 agent-port {{ role_haproxy__agent_base_port + item.proxy_port }}
+{% endfor %}
+{% endfor %}
